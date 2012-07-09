@@ -197,7 +197,7 @@
       $('#pitch-details .content').html(Mustache.render(pitchDetailsTemplate, {}));
       
 
-      d3.json('/data/pitches-ny.json', function(data) {
+      d3.json('data/pitches-ny.json', function(data) {
         all = data['pitches'];
         pitchers = data['pitchers'];
         batters = data['batters'];
