@@ -18,12 +18,19 @@
             <h3>Plot Options</h3>
             <div id="plot-options">
               <form>
-                <span class="label">Metric:</span>
+                <span class="label">Plot:</span>
                 <input type="radio" name="metric" value="location" checked>
                 <label for="metric">Pitch Location</label>
-                <!-- <br> -->
                 <input type="radio" name="metric" value="movement">
                 <label for="metric">Pitch Movement</label>
+                <br>
+                <span class="label">Color:</span>
+                <input type="radio" name="color" value="pitch-type" checked>
+                <label for="color">Pitch Type</label>
+                <input type="radio" name="color" value="velocity">
+                <label for="color">Velocity</label><br>
+                <input type="radio" name="color" value="balls-strikes">
+                <label for="color">Balls or Strikes</label>
               </form>
             </div>
             <div id="pitch-details">
@@ -246,9 +253,17 @@
         // filter_pitch_types();
         $('#pitch-types-filter select').change(filterPitchTypes);
 
-        $('input[name=metric]').change(plot);
+        $('input[name=metric]').change(function() { 
+          // console.log("begin change");
+         svg.attr("opacity", 0);
+          svg.transition().duration(2000).attr("opacity", 1);
+          plot(); 
+          // svg.transition().duration(2000).attr("opacity", 1);
+          // console.log("end change");
+        });
         
         function plot() {
+         
           console.log("plotting");
           selectedPitches = all.filter(function(d) {
             return selectedPitchers.has(d.pitcher_id) && selectedPitchTypes.has(d.pitch_type);
@@ -272,33 +287,37 @@
           if (metric == "location") {
             x_min_max = [-3, 3]
             z_min_max = [0, 6];
+            x_scale.domain(x_min_max);
+            z_scale.domain(z_min_max);
             xVal = function(d) { return x_scale(d.px); };
             yVal = function(d) { return z_scale(d.pz); };
             axisLabel.text("Pitch Location Over Home Plate -- Catcher's View (in feet)");
-            // var mean_sz_top = d3.mean(selectedPitches, function(d) { return d.sz_top; });
-            // var mean_sz_bottom = d3.mean(selectedPitches, function(d) { return d.sz_bot; });
-            // console.log(mean_sz_top);
-            // console.log(mean_sz_bottom);
-            // svg.append("svg:rect")
-            //   .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
-            //   .attr("x", x_scale(-17.0/24.0)) 
-            //   .attr("height", z_scale(mean_sz_bottom) - z_scale(mean_sz_top))
-            //   .attr("y", z_scale(mean_sz_top))
-            //   .attr("stroke", "#000000")
-            //   .attr("fill-opacity", 0)
-            //   .classed("strike-zone", true);
-            
+            var mean_sz_top = d3.mean(selectedPitches, function(d) { return d.sz_top; });
+            var mean_sz_bottom = d3.mean(selectedPitches, function(d) { return d.sz_bot; });
+            var sz_x = x_scale(-17.0/24.0);
+            var sz_y = z_scale(mean_sz_top);
+            svg.append("svg:rect")
+              .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
+              .attr("x", sz_x) 
+              .attr("height", z_scale(mean_sz_bottom) - z_scale(mean_sz_top))
+              .attr("y", sz_y)
+              .classed("strike-zone", true);
+            // svg.append("svg:text")
+            //   .attr("x", sz_x)
+            //   .attr("y", sz_y)
+            //   .text("Strike Zone")
+            //   .classed("strike-zone-label", true);
           } else {
             x_min_max = d3.extent(all, function(x) { return parseFloat(x.pfx_x) });
             z_min_max = d3.extent(all, function(x) { return parseFloat(x.pfx_z) }); 
+            x_scale.domain(x_min_max);
+            z_scale.domain(z_min_max);
             xVal = function(d) { return x_scale(d.pfx_x); };
             yVal = function(d) { return z_scale(d.pfx_z); };
             axisLabel.text("Pitch Movement (in inches)");
             svg.select(".strike-zone").remove();
+            svg.select(".strike-zone-label").remove();
           }
-          
-          x_scale.domain(x_min_max);
-          z_scale.domain(z_min_max);
           
           d3.select(".x.axis").call(xAxis);
           d3.select(".y.axis").call(yAxis);
