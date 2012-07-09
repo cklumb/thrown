@@ -408,3 +408,27 @@ input[type="radio"] {
 /*  text-align: right;*/
 }
 
+.strike-zone {
+  opacity: .3;
+  fill-color: #000;
+  stroke: #000;
+  stroke-width: 3;
+  fill-opacity: .2;
+}
+
+.strike-zone-label {
+  opacity: .3;
+}
+
+input[value="location"] { 
+  margin-left: 24px;
+}
+
+input[value="velocity"] { 
+  margin-left: 43px;
+}
+
+input[value="balls-strikes"] { 
+  margin-left: 63px;
+}
+
