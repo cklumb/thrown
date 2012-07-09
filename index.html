@@ -1,0 +1,360 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>
+      Thrown
+    </title>
+    <link href="css/screen.css" media="screen" rel="stylesheet" type="text/css">
+    <link href="css/select2.css" media="screen" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Telex' rel='stylesheet' type='text/css'>
+  </head>
+  <body>
+    <div id="container">
+      <div id="plot_container">
+        <div id="plot"></div>
+        <div id="controls">
+          <div id="plot-info">
+            <h3>Plot Options</h3>
+            <div id="plot-options">
+              <form>
+                <span class="label">Metric:</span>
+                <input type="radio" name="metric" value="location" checked>
+                <label for="metric">Pitch Location</label>
+                <!-- <br> -->
+                <input type="radio" name="metric" value="movement">
+                <label for="metric">Pitch Movement</label>
+              </form>
+            </div>
+            <div id="pitch-details">
+            <h3>Pitch Details</h3>
+              <div class="note">Mouse over a plot point for details</div>
+              <div class="content"></div>
+            </div>
+          </div>
+          <div id="filters">
+            <h3>Filters</h3>
+            <div id="pitchers-filter">
+              <h4>Pitchers</h4>
+            </div>
+            <div id="pitch-types-filter">
+              <h4>Pitch Types</h4>
+            </div>
+            <div id="pitch-stats"></div>
+        </div>
+      </div>
+      
+      </div>
+    </div>
+    <script src="js/d3.v2.js" type="text/javascript"></script>
+    <script src="js/jquery-1.7.1.js" type="text/javascript"></script>
+    <script src="js/mustache.js" type="text/javascript"></script>
+    <script src="js/select2.js" type="text/javascript"></script>
+    <!-- <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script> -->
+    
+    <script type="text/javascript">
+      var pitchTypes = [ 
+        { code: "FF", name: "4-seam Fastball" },
+        { code: "CU", name: "Curveball" },
+        { code: "FC", name: "Cut Fastball" },
+        { code: "FS", name: "Split-finger Fastball" },
+        { code: "SI", name: "Sinker" },
+        { code: "SL", name: "Slider" },
+        { code: "FT", name: "2-seam Fastball" },
+        { code: "KN", name: "Knuckleball" },
+        { code: "CH", name: "Change-up" },
+        { code: "KC", name: "Knuckle Curve" },
+        { code: "FA", name: "Fastball" },
+        { code: "FO", name: "Forkball" },
+        { code: "EP", name: "Ephuus" },
+        { code: "SC", name: "Screwball" },
+        { code: "UN", name: "Unknown" },
+        { code: "IN", name: "Intentional Walk" },
+        { code: "PO", name: "Pitch out" }
+      ];
+      var pitchTypesMap = d3.map(d3.nest().key(function(d) { return d.code; }).rollup(function(d) { return d[0]; }).map(pitchTypes));
+      
+      var all;
+      var pitchers; // pitchers[]
+      var batters;
+      var pitchersMap; // eliasid -> pitcher
+      var battersMap; // eliasid -> batter
+      
+      var pitchesByPitchType;  // pitch_type -> pitches
+      var pitchTypeStats;
+      
+      var selectedPitches;
+      var selectedPitchers = d3.map();
+      var selectedPitchTypes = d3.map();
+      
+      var x_min_max;
+      var z_min_max;
+      x_min_max = [-3, 3]
+      z_min_max = [0, 6];
+      
+      var pitchDetailsTemplate = "<dl class='table-display'> \
+                                      <dt>Pitch Type:</dt> \
+                                      <dd>{{pitch_type_name}}</dd> \
+                                      <dt>Pitcher:</dt> \
+                                      <dd>{{pitcher_name}} - {{pitcher_throws}}</dd> \
+                                      <dt>Batter:</dt> \
+                                      <dd>{{batter_name}} - {{stand}}</dd> \
+                                      <dt>Balls:</dt> \
+                                      <dd>{{ball}}</dd> \
+                                      <dt>Strikes:</dt> \
+                                      <dd>{{strike}}</dd> \
+                                      <dt>Outcome:</dt> \
+                                      <dd>{{des}}</dd> \
+                                      <dt>Start Speed (mph):</dt> \
+                                      <dd>{{start_speed}}</dd> \
+                                      <dt>End Speed (mph):</dt> \
+                                      <dd>{{end_speed}}</dd> \
+                                    </dl>";
+
+      var pitchersSelectTemplate = "<select multiple> \
+                                        {{#selectedPitchers}} \
+                                        <option value=\"{{eliasid}}\" selected>{{first}} {{last}}</option> \
+                                        {{/selectedPitchers}} \
+                                        {{#pitchers}} \
+                                        <option value=\"{{eliasid}}\">{{first}} {{last}}</option> \
+                                        {{/pitchers}} \
+                                      </select>";
+                                      
+      var pitchTypesSelectTemplate = "<select multiple> \
+                                          {{#selectedPitchTypes}} \
+                                          <option value=\"{{code}}\" selected>{{name}}</option> \
+                                          {{/selectedPitchTypes}} \
+                                          {{#pitchTypes}} \
+                                          <option value=\"{{code}}\">{{name}}</option> \
+                                          {{/pitchTypes}} \
+                                        </select>";
+                                        
+      var pitchStatsTemplate = "<span class='stat'>{{selected}}</span> of <span class='stat'>{{all}}</span> pitches selected";
+                                        
+      var margin = {top: 10, right: 50, bottom: 50, left: 50},
+          width = 800 - margin.left - margin.right,
+          height = 800 - margin.top - margin.bottom
+
+      var svg = d3.select("#plot").append("svg:svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.bottom + margin.top)
+        .append("svg:g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        
+      var colorScale = d3.scale.category20()
+        .domain(pitchTypesMap.keys());
+        
+      var x_scale = d3.scale.linear()
+        .domain(x_min_max)
+        .range([0, width]);
+
+      var z_scale = d3.scale.linear()
+        .domain(z_min_max)
+        .range([height, 0]);
+        
+      var xAxis = d3.svg.axis()
+        .scale(x_scale)
+        .orient("bottom")
+        .tickSize(1);
+            
+      var yAxis = d3.svg.axis()
+        .scale(z_scale)
+        .orient("left")
+        .tickSize(1);
+            
+      svg.append("svg:g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")");
+        
+      svg.append("svg:g")
+        .attr("class", "y axis");
+        
+      var axisLabel = svg.append("text")
+        .attr("y", height + 40)
+        .attr("x", width / 2)
+        .attr("text-anchor", "middle")
+        .classed("axis", true)
+        .text("Placeholder");
+        
+      function pitcherSelectFormat(pitcher) {
+        return '<span class="pitcher" data-pitcher-id="' + pitcher.id + '">' + pitcher.text + "</span>";
+      }
+      
+      function pitchTypeSelectFormat(pitchType) {
+        return '<span style="background-color: ' + colorScale(pitchType.id) +'; padding: 0px 5px 0px 5px; margin-right: 5px;"></span><span class="pitch-type" data-pitch-type="' + pitchType.id + '">' +pitchType.text + "</span>";
+      }
+      
+      function pitchDetail(d) {
+        d.pitch_type_name = pitchTypesMap.get(d.pitch_type).name;
+        var pitcher = pitchersMap.get(d.pitcher_id);
+        d.pitcher_name = pitcher.first + " " + pitcher.last;
+        d.pitcher_throws = pitcher.throws;
+        var batter = battersMap.get(d.batter_id);
+        d.batter_name = batter.first + " " + batter.last;
+        $('#pitch-details .content').html(Mustache.render(pitchDetailsTemplate, d));
+      }
+
+      $('#pitch-details .content').html(Mustache.render(pitchDetailsTemplate, {}));
+      
+
+      d3.json('/data/pitches-ny.json', function(data) {
+        all = data['pitches'];
+        pitchers = data['pitchers'];
+        batters = data['batters'];
+        
+        // Pitchers
+        pitchersMap = d3.map(d3.nest().key(function(d) { return d.eliasid;}).rollup(function(d) { return d[0]; }).map(pitchers));
+        $('#pitchers-filter').append(Mustache.render(pitchersSelectTemplate, { "selectedPitchers" : pitchers.slice(0,2), "pitchers" : pitchers.slice(2)}));
+        
+        $('#pitchers-filter select').select2({
+          formatSelection: pitcherSelectFormat
+        });
+        
+        function filterPitchers(callPlot) {
+          callPlot = typeof callPlot !== 'undefined' ? callPlot : false;
+          var selectedOptions = $("#pitchers-filter select").find('option:selected');
+          selectedPitchers = d3.map();
+          selectedOptions.each(function(i, d) {
+            selectedPitchers.set(d.value, pitchersMap.get(d.value));
+          });
+          if (callPlot)
+            plot();
+        }
+        $('#pitchers-filter select').change(filterPitchers);
+        
+        // Batters
+        battersMap = d3.map(d3.nest().key(function(d) { return d.eliasid;}).rollup(function(d) { return d[0]; }).map(batters));
+        
+        // Pitch types
+        pitchesByPitchType = d3.map(d3.nest().key(function(d) { return d.pitch_type; }).map(all));
+        $('#pitch-types-filter').append(Mustache.render(pitchTypesSelectTemplate, { "selectedPitchTypes" : pitchTypes.slice(0, 11), "pitchTypes" : pitchTypes.slice(11) }));
+        $('#pitch-types-filter select').select2({
+          // formatResult: format,
+          formatSelection: pitchTypeSelectFormat
+        });
+        function filterPitchTypes(callPlot) {
+          callPlot = typeof callPlot !== 'undefined' ? callPlot : false;
+          var selectedOptions = $('#pitch-types-filter select').find('option:selected');
+          selectedPitchTypes = d3.map();
+          selectedOptions.each(function(i, d) {
+            selectedPitchTypes.set(d.value, pitchTypesMap.get(d.value));
+          });
+          if (callPlot)
+            plot();
+        }
+        // filter_pitch_types();
+        $('#pitch-types-filter select').change(filterPitchTypes);
+
+        $('input[name=metric]').change(plot);
+        
+        function plot() {
+          console.log("plotting");
+          selectedPitches = all.filter(function(d) {
+            return selectedPitchers.has(d.pitcher_id) && selectedPitchTypes.has(d.pitch_type);
+          });
+          
+          pitcher_stats = d3.nest().key(function (d) { return d.pitcher_id; })
+            .rollup(function(d) { return d.length;})
+            .map(selectedPitches);
+          pitcher_stats = d3.map(pitcher_stats);
+          
+          pitchTypeStats = d3.nest().key(function (d) { return d.pitch_type; }).rollup(function(d) { return d.length }).map(selectedPitches);
+          pitchTypeStats = d3.map(pitchTypeStats);
+          pitchesByPitchType.keys().forEach(function(d) {
+            if (!pitchTypeStats.has(d))
+              pitchTypeStats.set(d, 0);
+          });
+          
+          var xVal;
+          var yVal;
+          var metric = $('input[name=metric]:checked').val();
+          if (metric == "location") {
+            x_min_max = [-3, 3]
+            z_min_max = [0, 6];
+            xVal = function(d) { return x_scale(d.px); };
+            yVal = function(d) { return z_scale(d.pz); };
+            axisLabel.text("Pitch Location Over Home Plate -- Catcher's View (in feet)");
+            // var mean_sz_top = d3.mean(selectedPitches, function(d) { return d.sz_top; });
+            // var mean_sz_bottom = d3.mean(selectedPitches, function(d) { return d.sz_bot; });
+            // console.log(mean_sz_top);
+            // console.log(mean_sz_bottom);
+            // svg.append("svg:rect")
+            //   .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
+            //   .attr("x", x_scale(-17.0/24.0)) 
+            //   .attr("height", z_scale(mean_sz_bottom) - z_scale(mean_sz_top))
+            //   .attr("y", z_scale(mean_sz_top))
+            //   .attr("stroke", "#000000")
+            //   .attr("fill-opacity", 0)
+            //   .classed("strike-zone", true);
+            
+          } else {
+            x_min_max = d3.extent(all, function(x) { return parseFloat(x.pfx_x) });
+            z_min_max = d3.extent(all, function(x) { return parseFloat(x.pfx_z) }); 
+            xVal = function(d) { return x_scale(d.pfx_x); };
+            yVal = function(d) { return z_scale(d.pfx_z); };
+            axisLabel.text("Pitch Movement (in inches)");
+            svg.select(".strike-zone").remove();
+          }
+          
+          x_scale.domain(x_min_max);
+          z_scale.domain(z_min_max);
+          
+          d3.select(".x.axis").call(xAxis);
+          d3.select(".y.axis").call(yAxis);
+          
+          var circles = svg.selectAll("circle")
+            .data(selectedPitches, function(d) { return d.pitch_id; });
+          circles.enter().append("svg:circle")
+            .attr("cx", xVal)
+            .attr("cy", yVal)
+            .attr("fill", function(d) { return colorScale(d.pitch_type);})
+            .attr("fill-opacity", .7)
+            .attr("stroke", function(d) { return colorScale(d.pitch_type);})
+            .transition().attr("r", 2);
+          circles.exit()
+            .transition().attr("r", 0).remove();
+          circles
+            .attr("cx", xVal)
+            .attr("cy", yVal)
+          circles.on("mouseover", pitchDetail);
+          
+          $(".pitcher").live("mouseover", function() {
+            var pitcherId = $(this).data("pitcher-id");
+            circles.filter(function(d) { return d.pitcher_id == pitcherId;}).transition().attr("r", 4);
+          });
+          $(".pitcher").live("mouseleave", function() {
+            circles.transition().attr("r", 2);
+          });
+          $(".pitch-type").live("mouseover", function() {
+            var pitchType = $(this).data("pitch-type");
+            circles.filter(function(d) { return d.pitch_type == pitchType;}).transition().attr("r", 4);
+          });
+          $(".pitch-type").live("mouseleave", function() {
+            circles.transition().attr("r", 2);
+          });
+            
+          // var lines = svg.selectAll("line")
+          //   .data(selectedPitches, function(d) { return d.pitch_id; });
+          // lines.enter().append("svg:line")
+          //   .attr("x1", function(d) { return x_scale(d.px - d.pfx_x / 12.0); })
+          //   .attr("x2", function(d) { return x_scale(d.px); })
+          //   .attr("y1", function(d) { return z_scale(d.pz - d.pfx_z / 12.0); })
+          //   .attr("y2", function(d) { return z_scale(d.pz); })
+          //   .attr("stroke-opacity", .2)
+          //   // .attr("stroke", "#000000");
+          //   .attr("stroke", function(d) { return colorScale(d.pitch_type);});
+          // lines.exit().remove();
+          
+          $('#pitch-stats').html(Mustache.render(pitchStatsTemplate, { selected: selectedPitches.length, all: all.length}));
+
+        }
+        
+        filterPitchers();
+        filterPitchTypes();
+        plot();
+      });
+
+    </script>
+    <div class='a'></div>
+  </body>
+</html>
