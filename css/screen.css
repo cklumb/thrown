@@ -412,8 +412,8 @@ input[type="radio"] {
   opacity: .3;
   fill-color: #000;
   stroke: #000;
-  stroke-width: 3;
-  fill-opacity: .2;
+  stroke-width: 2;
+  fill-opacity: .1;
 }
 
 .strike-zone-label {

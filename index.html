@@ -19,18 +19,18 @@
             <div id="plot-options">
               <form>
                 <span class="label">Plot:</span>
-                <input type="radio" name="metric" value="location" checked>
-                <label for="metric">Pitch Location</label>
-                <input type="radio" name="metric" value="movement">
-                <label for="metric">Pitch Movement</label>
-                <br>
+                <input type="radio" name="metric" value="location" title="Location of the pitch as it crosses home plate" checked>
+                <label for="metric" title="Location of the pitch as it crosses home plate">Pitch Location</label>
+                <input type="radio" name="metric" value="movement" title="Pitchers impart spin on the ball to cause it to deviate from its normal trajectory">
+                <label for="metric" title="Pitchers impart spin on the ball to cause it to deviate from its normal trajectory">Pitch Movement</label>
+                <!-- <br>
                 <span class="label">Color:</span>
                 <input type="radio" name="color" value="pitch-type" checked>
                 <label for="color">Pitch Type</label>
                 <input type="radio" name="color" value="velocity">
                 <label for="color">Velocity</label><br>
                 <input type="radio" name="color" value="balls-strikes">
-                <label for="color">Balls or Strikes</label>
+                <label for="color">Balls or Strikes</label> -->
               </form>
             </div>
             <div id="pitch-details">
@@ -295,6 +295,8 @@
             var mean_sz_bottom = d3.mean(selectedPitches, function(d) { return d.sz_bot; });
             var sz_x = x_scale(-17.0/24.0);
             var sz_y = z_scale(mean_sz_top);
+            svg.select(".strike-zone").remove();
+            svg.select(".strike-zone-label").remove();
             svg.append("svg:rect")
               .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
               .attr("x", sz_x) 
