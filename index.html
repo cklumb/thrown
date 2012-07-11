@@ -48,6 +48,43 @@
             <div id="pitch-types-filter">
               <h4>Pitch Types</h4>
             </div>
+            <div id="count-filter">
+              <h4>Counts</h4>
+              <form>
+                <div>
+                <input type="checkbox" name="count" value="0"checked>
+                <label for="count">0-0</label>
+                <input type="checkbox" name="count" value="1"checked>
+                <label for="count">0-1</label>
+                <input type="checkbox" name="count" value="2"checked>
+                <label for="count">0-2</label>
+                </div>
+                <div>
+                <input type="checkbox" name="count" value="10"checked>
+                <label for="count">1-0</label>
+                <input type="checkbox" name="count" value="11"checked>
+                <label for="count">1-1</label>
+                <input type="checkbox" name="count" value="12"checked>
+                <label for="count">1-2</label>
+                </div>
+                <div>
+                <input type="checkbox" name="count" value="20"checked>
+                <label for="count">2-0</label>
+                <input type="checkbox" name="count" value="21"checked>
+                <label for="count">2-1</label>
+                <input type="checkbox" name="count" value="22"checked>
+                <label for="count">2-2</label>
+                </div>
+                <div>
+                <input type="checkbox" name="count" value="30"checked>
+                <label for="count">3-0</label>
+                <input type="checkbox" name="count" value="31"checked>
+                <label for="count">3-1</label>
+                <input type="checkbox" name="count" value="32"checked>
+                <label for="count">3-2</label>
+                </div>
+              </form>
+            </div>
             <div id="pitch-stats"></div>
         </div>
       </div>
@@ -94,6 +131,7 @@
       var selectedPitches;
       var selectedPitchers = d3.map();
       var selectedPitchTypes = d3.map();
+      var selectedCounts = d3.map();
       
       var x_min_max;
       var z_min_max;
@@ -205,7 +243,7 @@
       $('#pitch-details .content').html(Mustache.render(pitchDetailsTemplate, {}));
       
 
-      d3.json('data/pitches-ny.json', function(data) {
+      d3.json('data/pitches.json', function(data) {
         all = data['pitches'];
         pitchers = data['pitchers'];
         batters = data['batters'];
@@ -220,9 +258,8 @@
         
         function filterPitchers(callPlot) {
           callPlot = typeof callPlot !== 'undefined' ? callPlot : false;
-          var selectedOptions = $("#pitchers-filter select").find('option:selected');
           selectedPitchers = d3.map();
-          selectedOptions.each(function(i, d) {
+          $("#pitchers-filter select").find('option:selected').each(function(i, d) {
             selectedPitchers.set(d.value, pitchersMap.get(d.value));
           });
           if (callPlot)
@@ -242,9 +279,8 @@
         });
         function filterPitchTypes(callPlot) {
           callPlot = typeof callPlot !== 'undefined' ? callPlot : false;
-          var selectedOptions = $('#pitch-types-filter select').find('option:selected');
           selectedPitchTypes = d3.map();
-          selectedOptions.each(function(i, d) {
+          $('#pitch-types-filter select').find('option:selected').each(function(i, d) {
             selectedPitchTypes.set(d.value, pitchTypesMap.get(d.value));
           });
           if (callPlot)
@@ -252,6 +288,18 @@
         }
         // filter_pitch_types();
         $('#pitch-types-filter select').change(filterPitchTypes);
+        
+        function filterCounts(callPlot) {
+          callPlot = typeof callPlot !== 'undefined' ? callPlot : false;
+          selectedCounts = d3.map();
+          $('input[name=count]:checked').each(function(i, d) {
+            var value = parseInt(d.value);
+            selectedCounts.set(value, value);
+          });
+          if (callPlot)
+            plot();
+        }
+        $('input[name=count]').change(filterCounts);
 
         $('input[name=metric]').change(function() { 
           // console.log("begin change");
@@ -266,7 +314,7 @@
          
           console.log("plotting");
           selectedPitches = all.filter(function(d) {
-            return selectedPitchers.has(d.pitcher_id) && selectedPitchTypes.has(d.pitch_type);
+            return selectedPitchers.has(d.pitcher_id) && selectedPitchTypes.has(d.pitch_type) && selectedCounts.has(parseInt(d.ball * 10 + d.strike));
           });
           
           pitcher_stats = d3.nest().key(function (d) { return d.pitcher_id; })
@@ -296,14 +344,14 @@
             var mean_sz_bottom = d3.mean(selectedPitches, function(d) { return d.sz_bot; });
             var sz_x = x_scale(-17.0/24.0);
             var sz_y = z_scale(mean_sz_top);
-            svg.select(".strike-zone").remove();
-            svg.select(".strike-zone-label").remove();
-            svg.append("svg:rect")
-              .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
-              .attr("x", sz_x) 
-              .attr("height", z_scale(mean_sz_bottom) - z_scale(mean_sz_top))
-              .attr("y", sz_y)
-              .classed("strike-zone", true);
+            // svg.select(".strike-zone").remove();
+            // svg.select(".strike-zone-label").remove();
+            // svg.append("svg:rect")
+            //   .attr("width", x_scale(17.0/12.0) - x_scale(0)) // home plate is 17 inches wide
+            //   .attr("x", sz_x) 
+            //   .attr("height", z_scale(mean_sz_bottom) - z_scale(mean_sz_top))
+            //   .attr("y", sz_y)
+            //   .classed("strike-zone", true);
             // svg.append("svg:text")
             //   .attr("x", sz_x)
             //   .attr("y", sz_y)
@@ -373,6 +421,7 @@
         
         filterPitchers();
         filterPitchTypes();
+        filterCounts();
         plot();
       });
 

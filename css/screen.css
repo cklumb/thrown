@@ -432,3 +432,13 @@ input[value="balls-strikes"] {
   margin-left: 63px;
 }
 
+#count-filter {
+  padding-bottom: .5em;
+  margin-bottom: .5em;
+  border-bottom: 1px solid #999;
+}
+
+#count-filter input {
+  margin-left: 10px;
+}
+
