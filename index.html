@@ -264,7 +264,7 @@
         
         // Pitchers
         pitchersMap = d3.map(d3.nest().key(function(d) { return d.eliasid;}).rollup(function(d) { return d[0]; }).map(pitchers));
-        $('#pitchers-filter').append(Mustache.render(pitchersSelectTemplate, { "selectedPitchers" : pitchers.slice(0,2), "pitchers" : pitchers.slice(2)}));
+        $('#pitchers-filter').append(Mustache.render(pitchersSelectTemplate, { "selectedPitchers" : pitchers.filter(function(d) { return d.last == "Sabathia"}), "pitchers" : pitchers.filter(function(d) { return d.last != "Sabathia"})}));
         
         $('#pitchers-filter select').select2({
           formatSelection: pitcherSelectFormat
